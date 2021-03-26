@@ -268,30 +268,22 @@ class Cubot:
     OPPOSITES = {
         Cube.FACES[i]: Cube.FACES[(i + 3) % 6] for i in range(0, len(Cube.FACES))
     }
+    VALID_RESPONSES = {"OK", "ERROR"}
 
     def __init__(self):
         self.hub = MSHub()
         self.vcp = hub.USB_VCP()
-        self.color_arm = Motor("D")
         self.grabbing_arm = Motor("E")
         self.turning_base = Motor("F")
-        self.color_arm_home_pos = self.color_arm.get_position()
         self.grabbing_arm_home_pos = self.grabbing_arm.get_position()
         self.turning_base_home_pos = self.turning_base.get_position()
         self.last_turn_sense = None
 
-        for motor in [self.color_arm, self.grabbing_arm, self.turning_base]:
+        for motor in [self.grabbing_arm, self.turning_base]:
             motor.set_stop_action("brake")
             motor.set_stall_detection(True)
 
         self.cube = Cube()
-
-    def reset_color_arm(self):
-        self.color_arm.start_at_power(-30)
-        wait_for_seconds(0.5)
-        wait_until(self.color_arm.get_speed, equal_to, 0)
-        self.color_arm.stop()
-        self.color_arm_home_pos = self.color_arm.get_position()
 
     def reset_grabbing_arm(self):
         self.grabbing_arm.start_at_power(40)
@@ -304,7 +296,6 @@ class Cubot:
         self.turning_base_home_pos = self.turning_base.get_position()
 
     def reset_all(self):
-        self.reset_color_arm()
         self.reset_grabbing_arm()
         self.reset_turning_base()
         self.hub.light_matrix.show_image("SQUARE")
@@ -408,25 +399,41 @@ class Cubot:
         if not self.vcp.isconnected():
             raise Exception("PiCube is not connected")
 
+    def write(self, msg):
+        self.hub.light_matrix.write(msg)
+
+    def ok_beep(self):
+        self.hub.speaker.beep(80, 0.2)
+
+    def error_beep(self):
+        self.hub.speaker.beep(60, 1.5)
+
     def send_command(self, command):
         self._check_connection()
         self.vcp.write(command + "\n")
-        print("Sent command '%s'" % command)
+        self.ok_beep()
 
     def wait_for_response(self):
         while True:
             if self.vcp.any():
                 input_data = self.vcp.read()
                 response = input_data.decode("utf-8")
-                print("Received response '%s'" % response)
+                self.write("R> '%s'" % response)
+                if response not in Cubot.VALID_RESPONSES:
+                    raise Exception("Invalid response %s" % response[:8])
                 return response
-                wait_for_seconds(0.2)
+            wait_for_seconds(0.2)
 
     def run(self):
         for face in Cube.FACES:
-            self._place_face_down(Cubot.OPPOSITES[face])
-            self.send_command("IMAGE face_%s" % face)
-            response = self.wait_for_response()
+            try:
+                self._place_face_down(Cubot.OPPOSITES[face])
+                self.send_command("IMAGE face_%s" % face)
+                response = self.wait_for_response()
+            except Exception as e:
+                self.error_beep()
+                self.write(str(e))
+                return
             if response != "OK":
                 raise Exception("Error while communicating with PiCube")
 
