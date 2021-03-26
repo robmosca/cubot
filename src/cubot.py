@@ -1,4 +1,6 @@
 import re
+import hub
+
 from mindstorms import MSHub, Motor
 from mindstorms.control import wait_for_seconds, wait_until
 from mindstorms.operator import equal_to
@@ -263,9 +265,13 @@ class Cubot:
     VALID_MOVES = {
         move + variation for move in Cube.FACES for variation in ["", "'", "2"]
     }
+    OPPOSITES = {
+        Cube.FACES[i]: Cube.FACES[(i + 3) % 6] for i in range(0, len(Cube.FACES))
+    }
 
     def __init__(self):
         self.hub = MSHub()
+        self.vcp = hub.USB_VCP()
         self.color_arm = Motor("D")
         self.grabbing_arm = Motor("E")
         self.turning_base = Motor("F")
@@ -398,8 +404,34 @@ class Cubot:
         for move in mvs:
             self._apply_one_move(move)
 
+    def _check_connection(self):
+        if not self.vcp.isconnected():
+            raise Exception("PiCube is not connected")
+
+    def send_command(self, command):
+        self._check_connection()
+        self.vcp.write(command + "\n")
+        print("Sent command '%s'" % command)
+
+    def wait_for_response(self):
+        while True:
+            if self.vcp.any():
+                input_data = self.vcp.read()
+                response = input_data.decode("utf-8")
+                print("Received response '%s'" % response)
+                return response
+                wait_for_seconds(0.2)
+
+    def run(self):
+        for face in Cube.FACES:
+            self._place_face_down(Cubot.OPPOSITES[face])
+            self.send_command("IMAGE face_%s" % face)
+            response = self.wait_for_response()
+            if response != "OK":
+                raise Exception("Error while communicating with PiCube")
+
 
 c = Cubot()
 c.reset_all()
-c.apply_moves("U R F D2 L U2")
+c.run()
 c.rest()
