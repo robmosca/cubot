@@ -408,6 +408,11 @@ class Cubot:
     def error_beep(self):
         self.hub.speaker.beep(60, 1.5)
 
+    def end_beep(self):
+        self.hub.speaker.beep(80, 0.4)
+        self.hub.speaker.beep(84, 0.4)
+        self.hub.speaker.beep(80, 0.4)
+
     def send_command(self, command):
         self._check_connection()
         self.vcp.write(command + "\n")
@@ -417,17 +422,15 @@ class Cubot:
         while True:
             if self.vcp.any():
                 input_data = self.vcp.read()
-                response = input_data.decode("utf-8")
-                self.write("R> '%s'" % response)
-                if response not in Cubot.VALID_RESPONSES:
-                    raise Exception("Invalid response %s" % response[:8])
-                return response
-            wait_for_seconds(0.2)
+                response = input_data.decode("utf-8").strip()
+                if response in Cubot.VALID_RESPONSES:
+                    return response
 
     def run(self):
-        for face in Cube.FACES:
+        for face in ["L", "F", "D", "R", "B", "U"]:
             try:
                 self._place_face_down(Cubot.OPPOSITES[face])
+                self.rest()
                 self.send_command("IMAGE face_%s" % face)
                 response = self.wait_for_response()
             except Exception as e:
@@ -440,5 +443,10 @@ class Cubot:
 
 c = Cubot()
 c.reset_all()
-c.run()
-c.rest()
+try:
+    c.run()
+    c.end_beep()
+    c.write("Done!")
+except Exception as e:
+    c.error_beep()
+    c.write(str(e))

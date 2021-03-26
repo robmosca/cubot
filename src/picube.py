@@ -24,17 +24,20 @@ class CubotCam:
         self.cam = CubotCam._init_pi_cam()
         self.orig_face = None
         self.square_face = None
-        self.norm_face = None
 
     def capture(self):
         img = np.empty((CubotCam.IMG_HEIGHT * CubotCam.IMG_WIDTH * 3,), dtype=np.uint8)
         self.cam.capture(img, "bgr")
         self.orig_face = img.reshape((CubotCam.IMG_HEIGHT, CubotCam.IMG_WIDTH, 3))
 
-        pts1 = np.float32([[155, 185], [480, 185], [-40, 480], [610, 480]])
+        pts1 = np.float32([[140, 180], [465, 180], [-30, 465], [620, 465]])
         pts2 = np.float32([[0, 0], [300, 0], [0, 300], [300, 300]])
         M = cv2.getPerspectiveTransform(pts1, pts2)
         self.square_face = cv2.warpPerspective(self.orig_face, M, (300, 300))
+
+    def save_capture(self, img_name):
+        cv2.imwrite("images/%s-orig.png" % img_name, self.orig_face)
+        cv2.imwrite("images/%s-square.png" % img_name, self.square_face)
 
 
 class PiCube:
@@ -67,31 +70,39 @@ class PiCube:
         if self.port is None:
             raise Exception("Cubot is not connected")
 
+        print("⏳ Waiting for command...")
         while True:
             try:
                 input_data = self.port.readline()
                 decoded_data = str(input_data.decode("utf-8"))
-                command, *arguments = decoded_data.split()
-                if command in PiCube.COMMANDS:
-                    return (command, *arguments)
-            except Exception:
+                lines = decoded_data.split("\r")
+                for line in lines:
+                    command, *args = line.split()
+                    print("Command:", command, *args)
+                    if command in PiCube.COMMANDS:
+                        return (command, args)
+            except Exception as e:
                 print("Error while receiving data from Cubot, disconnecting...")
                 self.disconnect()
+                raise e
 
     def send_reponse(self, response):
-        self.port.write(response + "\n")
+        self.port.write(bytes(response + "\n\r", "utf-8"))
+        print("Response sent (%s)" % response)
 
     def run(self):
         while True:
             command, args = self.wait_for_command()
-            print(command)
+            print("⚙️ Command received: '%s'" % command)
             if command == "EXIT":
                 print("Exiting...")
                 return
             elif command == "IMAGE":
-                img_name = args[0] + ".png"
+                img_name = args[0]
                 print("Saving image %s..." % img_name)
-                self.cubot_cam.capture(img_name)
+                self.cubot_cam.capture()
+                self.cubot_cam.save_capture(img_name)
+                time.sleep(0.2)
                 self.send_reponse("OK")
 
 
