@@ -4,7 +4,9 @@ import picamera
 import serial
 import time
 
+from cube import Cube
 from os import path
+from twophase import solve
 
 
 class CubotCam:
@@ -61,25 +63,60 @@ class CubotCam:
         class_file = path.join(folder, "%s-class.txt" % img_name)
         self.labels = open(class_file).read() if path.exists(class_file) else []
 
+    @staticmethod
+    def _detect_color(hsv):
+        if hsv[1] < 100:
+            return "W"
+        elif hsv[0] < 12:
+            return "O"
+        elif hsv[0] < 36:
+            return "Y"
+        elif hsv[0] < 80:
+            return "G"
+        elif hsv[0] < 120:
+            return "B"
+        else:
+            return "R"
+
     def identify_colors(self):
         hsv = cv2.cvtColor(self.square_face, cv2.COLOR_BGR2HSV)
-        # hsv = self.square_face
-        # cv2.imshow("Image", self.square_face)
+        face_colors = []
         for (i, (sp, pos)) in enumerate(CubotCam.SAMPLING_POINTS):
             mask = np.zeros(hsv.shape[:2], dtype="uint8")
             cv2.circle(mask, sp, CubotCam.SAMPLING_RADIUS, 255, -1)
             average = cv2.mean(hsv, mask)
-            sample = (average, pos, self.labels[i] if i < len(self.labels) else "-")
+            color = CubotCam._detect_color(average)
+            face_colors.append(color)
+            sample = average[:3] + (
+                pos,
+                self.labels[i] if self.labels and i < len(self.labels) else "-",
+                color,
+            )
             self.samples.append(sample)
-            masked = cv2.bitwise_and(self.square_face, self.square_face, mask=mask)
-            # cv2.imshow("Sample", masked)
-            # print("%5.1f  %5.1f  %5.1f  %s  %s" % (average[:3] + sample[1:]))
-            # cv2.waitKey(0)
+        return face_colors
+
+    def test(self, folder="images"):
+        self.samples = []
+        for face in ["U", "R", "F", "D", "L", "B"]:
+            self.load_capture("face_%s" % face, folder)
+            self.identify_colors()
+
+        print("Sorted results")
+        print("----------------------------")
+        results = sorted(ccam.samples, key=(lambda x: (x[1] >= 100, x[0])))
+        errors = 0
+        for e in results:
+            print("%5.1f  %5.1f  %5.1f  %s  %s %s" % e)
+            if e[4] != e[5]:
+                errors += 1
+        print("----------------------------")
+        print("Errors:", errors)
+        print("----------------------------")
 
 
 class PiCube:
     LEGO_HUB_DEVICE = "/dev/ttyACM0"
-    COMMANDS = {"IMAGE", "EXIT"}
+    COMMANDS = {"DETECT", "SOLVE", "IMAGE", "EXIT"}
 
     def __init__(self):
         self.cubot_cam = CubotCam()
@@ -140,27 +177,30 @@ class PiCube:
                 self.cubot_cam.save_capture(img_name)
                 time.sleep(0.2)
                 self.send_reponse("OK")
+            elif command == "DETECT":
+                face = args[0]
+                print("Detecting colors of face %s..." % face)
+                self.cubot_cam.capture()
+                colors = self.cubot_cam.identify_colors()
+                time.sleep(0.2)
+                self.send_reponse("OK %s" % "".join(colors))
+            elif command == "SOLVE":
+                conf = args[0]
+                print("Solving cube %s..." % conf)
+                cube = Cube(conf)
+                cube.print()
+                solution = solve(conf)
+                print("Solution: %s" % solution)
+                self.send_reponse("OK %s" % solution)
 
 
-# pi_cube = PiCube()
-# if pi_cube.connect():
-#     pi_cube.run()
-#     pi_cube.disconnect()
+pi_cube = PiCube()
+if pi_cube.connect():
+    pi_cube.run()
+    pi_cube.disconnect()
 
-ccam = CubotCam()
-for face in ["U", "R", "F", "D", "L", "B"]:
-    ccam.load_capture("face_%s" % face, "/home/pi/Pictures/scrambled_1")
-    ccam.identify_colors()
-
-results = sorted(ccam.samples, key=(lambda x: (x[0][1] >= 100, x[0][0])))
-cl = [c for c in ["W", "O", "Y", "G", "B", "R"] for i in range(9)]
-errors = 0
-for e, c in zip(results, cl):
-    print("%5.1f  %5.1f  %5.1f  %s  %s" % (e[0][:3] + e[1:]))
-    if c != e[2]:
-        errors += 1
-
-print("Errors:", errors)
+# ccam = CubotCam()
+# ccam.test("/home/pi/Pictures/scrambled_1")
 
 # c = CubotCam()
 # c.capture()
