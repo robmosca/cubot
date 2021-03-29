@@ -30,9 +30,9 @@ class CubotCam:
         camera = picamera.PiCamera()
         camera.resolution = (CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
         camera.framerate = 24
-        # camera.start_preview(
-        #     fullscreen=False, window=(1320, 10, CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
-        # )
+        camera.start_preview(
+            fullscreen=False, window=(1400, 10, CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
+        )
         time.sleep(2)
         return camera
 
@@ -69,11 +69,11 @@ class CubotCam:
             return "W"
         elif hsv[0] < 12:
             return "O"
-        elif hsv[0] < 36:
+        elif hsv[0] < 40:
             return "Y"
         elif hsv[0] < 80:
             return "G"
-        elif hsv[0] < 120:
+        elif hsv[0] < 150:
             return "B"
         else:
             return "R"
@@ -161,7 +161,7 @@ class PiCube:
 
     def send_reponse(self, response):
         self.port.write(bytes(response + "\n\r", "utf-8"))
-        print("Response sent (%s)" % response)
+        print("✔️ Response sent (%s)" % response)
 
     def run(self):
         while True:
@@ -172,25 +172,25 @@ class PiCube:
                 return
             elif command == "IMAGE":
                 img_name = args[0]
-                print("Saving image %s..." % img_name)
+                print("💾 Saving image %s..." % img_name)
                 self.cubot_cam.capture()
                 self.cubot_cam.save_capture(img_name)
                 time.sleep(0.2)
                 self.send_reponse("OK")
             elif command == "DETECT":
                 face = args[0]
-                print("Detecting colors of face %s..." % face)
+                print("🔎 Detecting colors of face %s..." % face)
                 self.cubot_cam.capture()
                 colors = self.cubot_cam.identify_colors()
                 time.sleep(0.2)
                 self.send_reponse("OK %s" % "".join(colors))
             elif command == "SOLVE":
                 conf = args[0]
-                print("Solving cube %s..." % conf)
+                print("🤔 Solving cube %s..." % conf)
                 cube = Cube(conf)
                 cube.print()
                 solution = solve(conf)
-                print("Solution: %s" % solution)
+                print("✉️ Sending solution: %s" % solution)
                 self.send_reponse("OK %s" % solution)
 
 
@@ -199,12 +199,8 @@ if pi_cube.connect():
     pi_cube.run()
     pi_cube.disconnect()
 
+# While testing the color recognition algorithm...
 # ccam = CubotCam()
 # ccam.test("/home/pi/Pictures/scrambled_1")
-
-# c = CubotCam()
-# c.capture()
-# cv2.namedWindow("image")
-# for img in [c.orig_face, c.square_face, c.norm_face]:
-#     cv2.imshow("image", img)
-#     cv2.waitKey(0)
+# ccam.test("/home/pi/Pictures/scrambled_2")
+# ccam.test("/home/pi/Pictures/scrambled_3")

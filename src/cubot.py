@@ -1,7 +1,7 @@
 import re
 import hub
 
-from mindstorms import MSHub, Motor
+from mindstorms import DistanceSensor, MSHub, Motor
 from mindstorms.control import wait_for_seconds, wait_until
 from mindstorms.operator import equal_to
 
@@ -304,7 +304,8 @@ class Cubot:
         self.hub = MSHub()
         self.vcp = hub.USB_VCP()
         self.grabbing_arm = Motor("E")
-        self.turning_base = Motor("F")
+        self.turning_base = Motor("A")
+        self.distance_sensor = DistanceSensor("C")
         self.grabbing_arm_home_pos = self.grabbing_arm.get_position()
         self.turning_base_home_pos = self.turning_base.get_position()
         self.last_turn_sense = None
@@ -328,7 +329,6 @@ class Cubot:
     def reset_all(self):
         self.reset_grabbing_arm()
         self.reset_turning_base()
-        self.hub.light_matrix.show_image("SQUARE")
         wait_for_seconds(0.5)
 
     def _move_grabbing_arm_to_pos(self, pos, speed=70):
@@ -368,10 +368,18 @@ class Cubot:
         if sense == "clockwise":
             distance_in_degrees = -distance_in_degrees
         self.turning_base.run_for_degrees(distance_in_degrees, 80)
-        if sense == "clockwise":
-            self.cube.apply("y" if times == 1 else "y2")
-        else:
-            self.cube.apply("y'" if times == 1 else "y2")
+        if times % 4 == 1:
+            if sense == "clockwise":
+                self.cube.apply("y")
+            else:
+                self.cube.apply("y'")
+        elif times % 4 == 3:
+            if sense == "clockwise":
+                self.cube.apply("y'")
+            else:
+                self.cube.apply("y")
+        elif times % 4 == 2:
+            self.cube.apply("y2")
 
     def turn_bottom_face(self, sense, times=1):
         print("Turning face %d degrees %s" % (90 * times, sense))
@@ -392,6 +400,22 @@ class Cubot:
             self.cube.apply("D" if times == 1 else "D2")
         else:
             self.cube.apply("D'" if times == 1 else "D2")
+
+    def wait_for_cube(self):
+        self.distance_sensor.light_up_all()
+        self.hub.light_matrix.show_image("SQUARE")
+        self.distance_sensor.wait_for_distance_closer_than(5, "cm", True)
+        self.hub.light_matrix.show_image("SQUARE_SMALL")
+        wait_for_seconds(0.5)
+        self.distance_sensor.light_up_all(0)
+
+    def wait_for_cube_removal(self):
+        self.distance_sensor.light_up_all()
+        self.hub.light_matrix.show_image("SQUARE_SMALL")
+        self.distance_sensor.wait_for_distance_farer_than(10, "cm", True)
+        self.hub.light_matrix.show_image("SQUARE")
+        wait_for_seconds(0.5)
+        self.distance_sensor.light_up_all(0)
 
     @staticmethod
     def _parse_move(move):
@@ -438,6 +462,12 @@ class Cubot:
     def error_beep(self):
         self.hub.speaker.beep(60, 1.5)
 
+    def success_beep(self):
+        for i in range(3):
+            self.hub.speaker.beep(60, 0.2)
+            self.hub.speaker.beep(64, 0.2)
+            self.hub.speaker.beep(67, 0.2)
+
     def end_beep(self):
         self.hub.speaker.beep(80, 0.4)
         self.hub.speaker.beep(84, 0.4)
@@ -460,24 +490,32 @@ class Cubot:
                     raise Exception("ERROR!")
 
     def run(self):
-        for face in ["L", "F", "D", "R", "B", "U"]:
-            try:
-                self._place_face_down(Cubot.OPPOSITES[face])
-                self.rest()
-                wait_for_seconds(0.5)
-                self.send_command("DETECT %s" % face)
-                response = self.wait_for_response()
-                self.cube.assign_colors_top_face(response)
-            except Exception as e:
-                self.error_beep()
-                self.write(str(e))
-                return
-        wait_for_seconds(0.5)
-        self.cube.reset_orientation()
-        self.send_command("SOLVE %s" % self.cube.get_cube_in_canonical_orientation())
-        response = self.wait_for_response()
-        self.write("SOLVING...")
-        self.apply_moves(response)
+        while True:
+            self.wait_for_cube()
+            for face in ["L", "F", "D", "R", "B", "U"]:
+                try:
+                    self._place_face_down(Cubot.OPPOSITES[face])
+                    self.rest()
+                    wait_for_seconds(0.2)
+                    self.send_command("DETECT %s" % face)
+                    response = self.wait_for_response()
+                    self.cube.assign_colors_top_face(response)
+                except Exception as e:
+                    self.error_beep()
+                    self.write(str(e))
+                    return
+            wait_for_seconds(0.2)
+            self.cube.reset_orientation()
+            self.send_command(
+                "SOLVE %s" % self.cube.get_cube_in_canonical_orientation()
+            )
+            response = self.wait_for_response()
+            self.apply_moves(response)
+            self.rest()
+            self.rotate_cube("clockwise", 4)
+            self.hub.light_matrix.show_image("SMILE")
+            self.success_beep()
+            self.wait_for_cube_removal()
 
 
 c = Cubot()
