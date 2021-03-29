@@ -188,11 +188,12 @@ class Cube:
                 Cube.FACES.index(init_conf[i]) if i < len(init_conf) else None
                 for i in range(0, Cube.NUM_FACELETS)
             ]
+            self.reset_orientation()
         else:
             self.cube = [
                 f for f in range(0, len(Cube.FACES)) for _ in range(0, Cube.FACE_SIZE)
             ]
-        self.faces = list(Cube.FACES)
+            self.faces = list(Cube.FACES)
 
     def _apply_one_transformation(self, transformation):
         if transformation not in Cube.TRANSFORMATIONS:
@@ -223,10 +224,30 @@ class Cube:
             self.cube[i] = Cube.COLOR_LETTERS.index(c)
 
     def reset_orientation(self):
-        omap = {Cube.FACES.index(self.faces[i]): i for i in range(len(Cube.FACES))}
-        new_cube = [omap[self.cube[i]] for i in range(0, Cube.NUM_FACELETS)]
-        self.cube = new_cube
-        self.faces = list(Cube.FACES)
+        self.faces = [Cube.FACES[self.cube[i]] for i in (4, 13, 22, 31, 40, 49)]
+
+    def bring_to_canonical(self):
+        if self.faces[1] == "U":
+            self.apply("z'")
+        elif self.faces[2] == "U":
+            self.apply("x")
+        elif self.faces[3] == "U":
+            self.apply("x2")
+        elif self.faces[4] == "U":
+            self.apply("z")
+        elif self.faces[5] == "U":
+            self.apply("x'")
+        if self.faces[1]== "F":
+            self.apply("y")
+        elif self.faces[4] == "F":
+            self.apply("y'")
+        elif self.faces[5] == "F":
+            self.apply("y2")
+
+    def get_cube_in_canonical_orientation(self):
+        nc = Cube(str(self))
+        nc.bring_to_canonical()
+        return str(nc)
 
     def __str__(self):
         return "".join([Cube.FACES[self.cube[i]] for i in range(0, Cube.NUM_FACELETS)])
