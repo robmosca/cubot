@@ -412,7 +412,7 @@ class Cubot:
     def wait_for_cube_removal(self):
         self.distance_sensor.light_up_all()
         self.hub.light_matrix.show_image("SQUARE_SMALL")
-        self.distance_sensor.wait_for_distance_farer_than(10, "cm", True)
+        self.distance_sensor.wait_for_distance_farther_than(10, "cm", True)
         self.hub.light_matrix.show_image("SQUARE")
         wait_for_seconds(0.5)
         self.distance_sensor.light_up_all(0)
@@ -474,20 +474,25 @@ class Cubot:
         self.hub.speaker.beep(80, 0.4)
 
     def send_command(self, command):
+        self.hub.light_matrix.show_image("ARROW_N")
         self._check_connection()
         self.vcp.write(command + "\n")
         self.ok_beep()
 
     def wait_for_response(self):
+        self.hub.light_matrix.show_image("ARROW_S")
+        response = ""
         while True:
             if self.vcp.any():
                 input_data = self.vcp.read()
-                response = input_data.decode("utf-8").strip()
-                status, *data = response.split()
-                if status == "OK":
-                    return " ".join(data)
-                else:
-                    raise Exception("ERROR!")
+                if input_data:
+                    response += input_data.decode("utf-8").strip()
+                    status, *data = response.split()
+                    if status == "OK":
+                        self.hub.light_matrix.show_image("SQUARE_SMALL")
+                        return " ".join(data)
+                    else:
+                        raise Exception("ERROR!")
 
     def run(self):
         while True:

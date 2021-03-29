@@ -30,9 +30,7 @@ class CubotCam:
         camera = picamera.PiCamera()
         camera.resolution = (CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
         camera.framerate = 24
-        camera.start_preview(
-            fullscreen=False, window=(1400, 10, CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
-        )
+
         time.sleep(2)
         return camera
 
@@ -52,6 +50,14 @@ class CubotCam:
         pts2 = np.float32([[0, 0], [300, 0], [0, 300], [300, 300]])
         M = cv2.getPerspectiveTransform(pts1, pts2)
         self.square_face = cv2.warpPerspective(self.orig_face, M, (300, 300))
+
+    def show_preview(self, x, y):
+        self.cam.start_preview(
+            fullscreen=False, window=(x, y, CubotCam.IMG_WIDTH, CubotCam.IMG_HEIGHT)
+        )
+
+    def hide_preview(self):
+        self.cam.stop_preview()
 
     def save_capture(self, img_name, folder="images"):
         cv2.imwrite(path.join(folder, "%s-orig.png" % img_name), self.orig_face)
@@ -151,9 +157,10 @@ class PiCube:
                 decoded_data = str(input_data.decode("utf-8"))
                 lines = decoded_data.split("\r")
                 for line in lines:
-                    command, *args = line.split()
-                    if command in PiCube.COMMANDS:
-                        return (command, args)
+                    if line.strip():
+                        command, *args = line.strip().split()
+                        if command in PiCube.COMMANDS:
+                            return (command, args)
             except Exception as e:
                 print("Error while receiving data from Cubot, disconnecting...")
                 self.disconnect()
@@ -164,6 +171,7 @@ class PiCube:
         print("✔️ Response sent (%s)" % response)
 
     def run(self):
+        self.cubot_cam.show_preview(1800, 10)
         while True:
             command, args = self.wait_for_command()
             print("⚙️ Command received: '%s'" % command)
