@@ -17,7 +17,7 @@ By clicking on the image, you can see the [Robot in action](https://youtu.be/T-D
 
 In this repository you can find the code I used, both on the LEGO Hub
 (`cubot.py`) and on the Raspberry Pi (`picube.py` and `cube.py`). The software
-is customized on specific cube I used (GAN Monster GO Magnetic).
+is customized on the specific cube I used (GAN Monster GO Magnetic).
 
 To load the micropython module on the LEGO Hub I used VS Code with the
 [LEGO® MINDSTORMS® Robot Inventor extension](https://github.com/robmosca/robotinventor-vscode) I wrote.
