@@ -11,7 +11,7 @@ following the links in [this other YouTube video](https://youtu.be/s2HexyswxKY).
 I modified the original instructions to replace the color sensor with a
 Raspberry Pi 4B + CamV2 Module.
 
-Here you can see the Robot in action:
+By clicking on the image, you can see the [Robot in action](https://youtu.be/T-D1KVIuvjA):
 
 [![Watch the video](https://img.youtube.com/vi/K98Nth4gAg8/maxresdefault.jpg)](https://youtu.be/T-D1KVIuvjA)
 
